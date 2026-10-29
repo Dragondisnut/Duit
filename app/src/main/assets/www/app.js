@@ -1,0 +1,307 @@
+(function () {
+  'use strict';
+  var K = window.KasKu;
+  var NATIVE = window.KasKuNative || null;
+  var KEY = 'kasku_state_v1';
+  var BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  var STATUS = {
+    good: { c: 'var(--good)', label: 'Aman' },
+    warning: { c: 'var(--warning)', label: 'Agak cepat' },
+    serious: { c: 'var(--serious)', label: 'Boros' },
+    critical: { c: 'var(--critical)', label: 'Lewat' }
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var state;
+
+  // ---------- Penyimpanan lokal ----------
+  function load() {
+    var raw = null;
+    try { if (NATIVE && NATIVE.loadState) raw = NATIVE.loadState(); } catch (e) {}
+    if (!raw) { try { raw = localStorage.getItem(KEY); } catch (e) {} }
+    if (raw) { try { return JSON.parse(raw); } catch (e) {} }
+    return K.newState(new Date());
+  }
+  function save() {
+    var raw = JSON.stringify(state);
+    try { localStorage.setItem(KEY, raw); } catch (e) {}
+    try { if (NATIVE && NATIVE.saveState) NATIVE.saveState(raw); } catch (e) {}
+  }
+
+  // ---------- Util tampilan ----------
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function short(n) {
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace('.', ',').replace(',0', '') + 'jt';
+    if (Math.abs(n) >= 1e3) return Math.round(n / 1e3) + 'rb';
+    return String(Math.round(n));
+  }
+  function hhmm(ts) { var d = new Date(ts); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function dmy(ts) { var d = new Date(ts); return d.getDate() + ' ' + BULAN[d.getMonth()].slice(0, 3); }
+  var ICON = {
+    warn: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 1 21h22L12 2Zm1 15h-2v2h2v-2Zm0-7h-2v5h2v-5Z"/></svg>',
+    info: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2v6Zm0-8h-2V7h2v2Z"/></svg>',
+    x: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" transform="translate(1.4 0)"/></svg>'
+  };
+
+  // ---------- Render ----------
+  function render() {
+    var now = new Date();
+    K.ensureMonth(state, now);
+    var st = K.status(state, now);
+    $('periode').textContent = BULAN[now.getMonth()] + ' ' + now.getFullYear() + ' · hari ke-' + st.day + ' dari ' + st.dim;
+
+    var left = st.flexLeft;
+    var fixedLeft = st.pots.filter(function (p) { return p.fixed && p.id !== 'tabungan'; }).reduce(function (a, p) { return a + Math.max(0, p.left); }, 0);
+    $('heroLeft').textContent = K.rp(left);
+    $('heroLeft').classList.toggle('neg', left <= 0);
+    $('heroPerDay').textContent = K.rp(st.flexPerDay);
+    $('heroDays').textContent = st.daysLeft;
+    var tab = st.pots.filter(function (p) { return p.id === 'tabungan'; })[0];
+    $('saveGot').textContent = K.rp(tab ? tab.spent : 0);
+    $('saveTarget').textContent = K.rp(tab ? tab.budget : 0);
+    $('saveRing').style.setProperty('--p', tab && tab.budget ? Math.min(100, tab.spent / tab.budget * 100) : 0);
+    $('heroLeft').title = 'Belum termasuk kas rumah ' + K.rp(fixedLeft);
+
+    // peringatan
+    var warns = K.warnings(state, now);
+    $('alerts').innerHTML = warns.map(function (w) {
+      var s = STATUS[w.level];
+      return '<div class="alert" style="--c:' + s.c + '">' + ICON.warn + '<div><span class="tag">' + s.label + '</span>' + esc(w.text) + '</div></div>';
+    }).join('');
+
+    // pos
+    $('pots').innerHTML = st.pots.map(function (p) {
+      var s = STATUS[p.level];
+      var pct = p.budget > 0 ? Math.min(100, p.spent / p.budget * 100) : 0;
+      var fill = p.level === 'good' ? 'var(--accent)' : s.c;
+      if (p.id === 'tabungan') fill = 'var(--good)';
+      var right = p.id === 'tabungan' ? K.rp(p.spent) + ' terkumpul' : 'sisa ' + K.rp(p.left);
+      var sub = p.id === 'tabungan' ? 'target ' + K.rp(p.budget)
+        : (p.fixed ? 'terpakai ' + K.rp(p.spent) + ' dari ' + K.rp(p.budget) : K.rp(p.perDay) + '/hari · dari ' + K.rp(p.budget));
+      var badge = (!p.fixed && p.level !== 'good') ? '<span class="status" style="--c:' + s.c + '">' + s.label + '</span>' : '';
+      return '<div class="pot">' +
+        '<div class="pot-top"><span class="pot-name">' + esc(p.name) + ' ' + badge + '</span><span class="pot-left' + (p.left < 0 ? ' neg' : '') + '">' + right + '</span></div>' +
+        '<div class="bar" role="progressbar" aria-label="' + esc(p.name) + '" aria-valuenow="' + Math.round(pct) + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + pct + '%;--fill:' + fill + '"></i>' +
+        (p.fixed ? '' : '<b style="left:calc(' + (st.timeFrac * 100) + '% - 1px)"></b>') + '</div>' +
+        '<div class="pot-sub"><span>' + sub + '</span><span>' + Math.round(pct) + '%</span></div></div>';
+    }).join('');
+
+    renderChart(st);
+
+    // realokasi
+    var month = state.months[st.month];
+    $('movesCard').hidden = !month.moves.length;
+    $('moves').innerHTML = month.moves.slice(-5).reverse().map(function (m) {
+      return '<div class="row"><div class="main"><div class="t">' + esc(potName(m.from)) + ' → ' + esc(potName(m.to)) + '</div><div class="m">' + dmy(m.ts) + ' · ' + (m.reason === 'darurat' ? 'darurat, dari tabungan' : 'otomatis') + '</div></div><div class="v">' + K.rp(m.amount) + '</div></div>';
+    }).join('');
+
+    // transaksi
+    $('txCount').textContent = st.tx.length ? st.tx.length + ' catatan bulan ini' : '';
+    $('txList').innerHTML = st.tx.length ? st.tx.slice(0, 30).map(function (t) {
+      var q = t.qty ? ' · ' + String(t.qty).replace('.', ',') + ' ' + (t.unit || '') : '';
+      return '<div class="row"><div class="main"><div class="t">' + esc(cap(t.name)) + '</div><div class="m">' + dmy(t.ts) + ' ' + hhmm(t.ts) + q + '</div></div>' +
+        '<span class="chip">' + esc(potName(t.pot)) + '</span><div class="v">' + K.rp(t.price) + '</div>' +
+        '<button class="del" data-del="' + t.id + '" aria-label="Hapus ' + esc(t.name) + '">' + ICON.x + '</button></div>';
+    }).join('') : '<div class="empty">Belum ada catatan. Ketik di bawah, misalnya: ayam 1 kg 40k</div>';
+  }
+
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function potName(id) { var p = state.settings.pots.filter(function (x) { return x.id === id; })[0]; return p ? p.name : id; }
+
+  function renderChart(st) {
+    var svg = $('chart');
+    var W = svg.clientWidth || 340, H = 170, padL = 34, padR = 6, padT = 10, padB = 22;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var flexBudget = st.pots.filter(function (p) { return !p.fixed; }).reduce(function (a, p) { return a + p.budget; }, 0);
+    var pace = flexBudget / st.dim;
+    var max = Math.max(pace * 1.4, Math.max.apply(null, st.daily) * 1.1, 1000);
+    var step = niceStep(max / 3);
+    max = Math.ceil(max / step) * step;
+    var bw = iw / st.dim;
+    var y = function (v) { return padT + ih - (v / max) * ih; };
+    var out = '';
+    for (var g = 0; g <= max + 1; g += step) {
+      out += '<line class="grid" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(g) + '" y2="' + y(g) + '"/>';
+      out += '<text x="' + (padL - 6) + '" y="' + (y(g) + 3) + '" text-anchor="end">' + short(g) + '</text>';
+    }
+    st.daily.forEach(function (v, i) {
+      var x = padL + i * bw + 1, w = Math.max(2, bw - 2);
+      var future = i + 1 > st.day;
+      if (v > 0) {
+        var top = y(v), base = padT + ih, r = Math.min(4, w / 2, base - top);
+        out += '<path class="b' + (i + 1 === st.day ? ' active' : '') + '" d="M' + x + ',' + base + 'V' + (top + r) + 'Q' + x + ',' + top + ' ' + (x + r) + ',' + top +
+          'H' + (x + w - r) + 'Q' + (x + w) + ',' + top + ' ' + (x + w) + ',' + (top + r) + 'V' + base + 'Z"/>';
+      } else if (future) {
+        out += '<rect class="b future" x="' + x + '" y="' + (padT + ih - 2) + '" width="' + w + '" height="2"/>';
+      }
+      out += '<rect class="hit" data-i="' + i + '" x="' + (padL + i * bw) + '" y="' + padT + '" width="' + bw + '" height="' + ih + '"/>';
+      if ((i + 1) % 5 === 0 || i === 0) out += '<text x="' + (padL + i * bw + bw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + (i + 1) + '</text>';
+    });
+    out += '<line class="axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + (padT + ih) + '" y2="' + (padT + ih) + '"/>';
+    out += '<line class="pace" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(pace) + '" y2="' + y(pace) + '"/>';
+    out += '<text x="' + (W - padR) + '" y="' + (y(pace) - 4) + '" text-anchor="end">jatah ' + short(pace) + '/hari</text>';
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.innerHTML = out;
+
+    var spentDays = st.daily.slice(0, st.day);
+    var avg = spentDays.reduce(function (a, b) { return a + b; }, 0) / Math.max(1, st.day);
+    $('avgDay').textContent = 'rata-rata ' + K.rp(avg) + '/hari';
+    $('dailyTable').innerHTML = '<table>' + st.daily.slice(0, st.day).map(function (v, i) {
+      return '<tr><td>Tanggal ' + (i + 1) + '</td><td>' + K.rp(v) + '</td></tr>';
+    }).reverse().join('') + '</table>';
+
+    svg.onclick = svg.onpointermove = function (e) {
+      var tgt = e.target.closest ? e.target.closest('.hit') : null;
+      var tip = $('tip');
+      svg.querySelectorAll('.b.active').forEach(function (n) { if (n.dataset.today !== '1') n.classList.remove('active'); });
+      if (!tgt) { tip.hidden = true; return; }
+      var i = +tgt.dataset.i;
+      var rect = svg.getBoundingClientRect();
+      tip.hidden = false;
+      tip.textContent = (i + 1) + ' ' + BULAN[new Date().getMonth()].slice(0, 3) + ': ' + K.rp(st.daily[i]);
+      tip.style.left = ((padL + i * bw + bw / 2) / W * rect.width) + 'px';
+    };
+    svg.onpointerleave = function () { $('tip').hidden = true; };
+  }
+  function niceStep(raw) {
+    var p = Math.pow(10, Math.floor(Math.log10(raw)));
+    var n = raw / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+  }
+
+  // ---------- Chat ----------
+  function addMsg(who, text) {
+    state.chat.push({ who: who, text: text, ts: Date.now() });
+    if (state.chat.length > 300) state.chat = state.chat.slice(-300);
+  }
+  function renderChat() {
+    var box = $('chat');
+    if (!state.chat.length) {
+      box.innerHTML = '<div class="msg bot">Halo! Cukup ketik apa yang kamu beli, berapa banyak, dan harganya. Contoh:\n• ayam 1 kg 40k, telor 1 kg 28k\n• bensin 20rb\n• honor aslab 400k\n\nAku yang catat, masukkan ke pos, atur ulang anggaran kalau ada yang jebol, dan kasih peringatan.</div>';
+      return;
+    }
+    box.innerHTML = state.chat.slice(-80).map(function (m) {
+      return '<div class="msg ' + m.who + '">' + esc(m.text) + '<span class="time">' + hhmm(m.ts) + '</span></div>';
+    }).join('');
+  }
+  function scrollChat() { window.scrollTo(0, document.body.scrollHeight); }
+
+  function send(text) {
+    text = text.trim();
+    if (!text) return;
+    addMsg('me', text);
+    var res = K.handle(state, text, new Date());
+    addMsg('bot', res.reply || 'Oke.');
+    save();
+    render(); renderChat();
+    if (!$('viewChat').hidden) scrollChat();
+    else toast(res.reply);
+  }
+
+  var toastTimer;
+  function toast(text) {
+    var t = $('toast');
+    t.textContent = text; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 4500);
+  }
+
+  // ---------- Ringkasan mingguan otomatis ----------
+  function maybeWeekly() {
+    var now = Date.now();
+    if (!state.lastSummary) { state.lastSummary = now; save(); return; }
+    if (now - state.lastSummary >= 7 * 86400000) {
+      addMsg('bot', K.weeklySummary(state, new Date()));
+      state.lastSummary = now; save();
+      $('badge').hidden = false;
+    }
+  }
+
+  // ---------- Tab ----------
+  function show(view) {
+    var chat = view === 'chat';
+    $('toast').hidden = true;
+    $('viewDash').hidden = chat; $('viewChat').hidden = !chat;
+    $('tabDash').setAttribute('aria-selected', String(!chat));
+    $('tabChat').setAttribute('aria-selected', String(chat));
+    if (chat) { $('badge').hidden = true; renderChat(); scrollChat(); }
+    else { window.scrollTo(0, 0); render(); }
+  }
+
+  // ---------- Pengaturan ----------
+  function openSettings() {
+    $('setIncome').value = state.settings.income;
+    $('setPots').innerHTML = state.settings.pots.map(function (p) {
+      return '<label class="field">' + esc(p.name) + '<input data-pot="' + p.id + '" inputmode="numeric" value="' + p.budget + '"></label>';
+    }).join('');
+    updateSum();
+    $('settings').showModal();
+  }
+  function updateSum() {
+    var inc = num($('setIncome').value);
+    var sum = 0;
+    document.querySelectorAll('#setPots input').forEach(function (i) { sum += num(i.value); });
+    var diff = inc - sum;
+    $('setSum').textContent = 'Total pos ' + K.rp(sum) + (diff === 0 ? ' — pas dengan uang bulanan.' : diff > 0 ? ' — masih sisa ' + K.rp(diff) + ' belum dibagi.' : ' — lebih ' + K.rp(-diff) + ' dari uang bulanan!');
+  }
+  function num(v) { return parseInt(String(v).replace(/[^\d]/g, ''), 10) || 0; }
+
+  // ---------- Init ----------
+  state = load();
+  K.ensureMonth(state, new Date());
+  maybeWeekly();
+  render(); renderChat();
+
+  $('form').addEventListener('submit', function (e) { e.preventDefault(); var v = $('input').value; $('input').value = ''; send(v); });
+  $('tabDash').onclick = function () { show('dash'); };
+  $('tabChat').onclick = function () { show('chat'); };
+  $('hints').onclick = function (e) { var q = e.target.dataset && e.target.dataset.q; if (q) send(q); };
+  $('txList').onclick = function (e) {
+    var b = e.target.closest('[data-del]'); if (!b) return;
+    var id = b.dataset.del;
+    Object.keys(state.months).forEach(function (k) {
+      var m = state.months[k]; var i = m.tx.findIndex(function (t) { return t.id === id; });
+      if (i >= 0) { var t = m.tx.splice(i, 1)[0]; toast('Dihapus: ' + cap(t.name) + ' ' + K.rp(t.price)); }
+    });
+    save(); render();
+  };
+  $('btnSettings').onclick = openSettings;
+  $('settings').addEventListener('input', updateSum);
+  $('btnSave').onclick = function () {
+    state.settings.income = num($('setIncome').value);
+    var key = K.monthKey(new Date());
+    document.querySelectorAll('#setPots input').forEach(function (i) {
+      var p = state.settings.pots.filter(function (x) { return x.id === i.dataset.pot; })[0];
+      var v = num(i.value);
+      if (p) { p.budget = v; state.months[key].budgets[p.id] = v; }
+    });
+    save(); render(); updateSum(); toast('Anggaran disimpan.');
+  };
+  $('btnBackup').onclick = function () {
+    var raw = JSON.stringify(state, null, 1);
+    var name = 'kasku-backup-' + K.dayKey(new Date()) + '.json';
+    if (NATIVE && NATIVE.saveBackup) { toast(NATIVE.saveBackup(name, raw)); return; }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+    a.download = name; a.click();
+  };
+  $('btnRestore').onclick = function () { $('fileRestore').click(); };
+  $('fileRestore').onchange = function () {
+    var f = this.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var s = JSON.parse(r.result);
+        if (!s.settings || !s.months) throw new Error('format');
+        state = s; save(); render(); renderChat(); toast('Backup dipulihkan.');
+      } catch (e) { toast('File backup tidak valid.'); }
+    };
+    r.readAsText(f);
+    this.value = '';
+  };
+  $('btnReset').onclick = function () {
+    if (!confirm('Hapus semua catatan? Tidak bisa dibatalkan.')) return;
+    state = K.newState(new Date()); save(); render(); renderChat(); toast('Semua data dihapus.');
+  };
+  window.addEventListener('resize', function () { if (!$('viewDash').hidden) render(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { K.ensureMonth(state, new Date()); maybeWeekly(); render(); } });
+})();
