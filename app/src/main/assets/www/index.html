@@ -75,6 +75,40 @@
     <div class="spacer"></div>
   </main>
 
+  <main id="viewGizi" class="view" hidden>
+    <div class="day-nav">
+      <button class="icon-btn" id="gPrev" aria-label="Hari sebelumnya">‹</button>
+      <div class="day-label" id="gDay">Hari ini</div>
+      <button class="icon-btn" id="gNext" aria-label="Hari berikutnya">›</button>
+      <button class="icon-btn" id="gSet" aria-label="Atur target gizi">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+    </div>
+    <section class="card gizi-hero">
+      <div id="gRing" class="ring-big"></div>
+      <div id="gNoTarget" class="empty" hidden>Target belum diatur. <button class="link" id="gSet2">Atur target</button></div>
+      <div id="gMini" class="mini-rings"></div>
+      <div id="gKomp" class="komp"></div>
+    </section>
+    <section class="card" id="gCariCard" hidden>
+      <div class="card-head"><h2 id="gCariJudul">Hasil pencarian</h2><button class="link" id="gCariTutup">Tutup</button></div>
+      <p class="muted small">Ketuk bahan untuk memilih, lalu ketik beratnya. Nilai per 100 g.</p>
+      <div id="gCariList" class="list"></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Makanan</h2><span class="muted small" id="gCount"></span></div>
+      <div id="gList" class="list"></div>
+    </section>
+    <div class="hints" id="gHints">
+      <button data-q="sisa">sisa</button>
+      <button data-q="batal">batal</button>
+      <button data-q="telur 2 butir">telur 2 butir</button>
+      <button data-fill="cari ">cari bahan…</button>
+    </div>
+    <p class="muted small src-note">Data gizi: TKPI (Kemenkes, panganku.org) dan USDA FoodData Central, per 100 g. Untuk bahan mentah, catat berat mentah; untuk yang bertanda "siap makan" (nasi, roti, masakan), timbang dalam bentuk siap makan. Ketik "cari &lt;nama&gt;" untuk melihat 1.200 bahan yang tersedia.</p>
+    <div class="spacer"></div>
+  </main>
+
   <div class="composer">
     <form id="form" autocomplete="off">
       <input id="input" type="text" placeholder="ayam 1 kg 40k, telor 1 kg 28k" enterkeyhint="send" aria-label="Catat pengeluaran">
@@ -85,6 +119,7 @@
     <nav class="tabs" role="tablist">
       <button role="tab" id="tabDash" aria-selected="true">Dashboard</button>
       <button role="tab" id="tabChat" aria-selected="false">Catat <span class="badge" id="badge" hidden></span></button>
+      <button role="tab" id="tabGizi" aria-selected="false">Gizi</button>
     </nav>
   </div>
 
@@ -110,8 +145,38 @@
       <div class="btn-row"><button value="close">Tutup</button></div>
     </form>
   </dialog>
+  <dialog id="giziSettings">
+    <form method="dialog" class="sheet">
+      <h2>Target gizi harian</h2>
+      <label class="field">Kalori (kkal) <input id="tKkal" inputmode="decimal"></label>
+      <label class="field">Protein (g) <input id="tP" inputmode="decimal"></label>
+      <label class="field">Lemak (g) <input id="tL" inputmode="decimal"></label>
+      <label class="field">Karbohidrat (g) <input id="tK" inputmode="decimal"></label>
+      <label class="field">Serat (g) <input id="tS" inputmode="decimal"></label>
+      <label class="field">Berat 1 butir telur tanpa kulit (g) <input id="tButir" inputmode="decimal"></label>
+      <p class="muted small" id="tCek"></p>
+      <div class="btn-row"><button type="button" id="tSimpan" class="primary">Simpan target</button></div>
+      <details class="calc">
+        <summary>Hitung otomatis (rumus Mifflin-St Jeor)</summary>
+        <label class="field">Berat badan (kg) <input id="cBB" inputmode="decimal"></label>
+        <label class="field">Tinggi badan (cm) <input id="cTB" inputmode="decimal"></label>
+        <label class="field">Umur (tahun) <input id="cUmur" inputmode="numeric"></label>
+        <label class="field">Jenis kelamin <select id="cJK"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></label>
+        <label class="field">Aktivitas <select id="cAkt"></select></label>
+        <label class="field">Defisit (kkal/hari) <input id="cDef" inputmode="numeric"></label>
+        <label class="field">Protein (g per kg BB) <input id="cProt" inputmode="decimal"></label>
+        <label class="field">Lemak (% kalori) <input id="cLemak" inputmode="decimal"></label>
+        <p class="muted small" id="cHasil"></p>
+        <div class="btn-row"><button type="button" id="cHitung">Hitung &amp; isi kolom di atas</button></div>
+        <p class="muted small">Serat diisi 14 g per 1000 kkal (anjuran Dietary Guidelines for Americans). Karbohidrat = sisa kalori setelah protein dan lemak. Semua angka bisa diubah manual sebelum disimpan.</p>
+      </details>
+      <div class="btn-row"><button value="close">Tutup</button></div>
+    </form>
+  </dialog>
 </div>
 <script src="engine.js"></script>
+<script src="gizi_db.js"></script>
+<script src="gizi.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

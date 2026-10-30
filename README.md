@@ -22,6 +22,30 @@ Aplikasi ini **tidak punya izin internet**. Semua data tersimpan hanya di HP.
 | `sisa` | lihat sisa semua pos |
 | `ringkasan` | ringkasan 7 hari terakhir |
 
+## Tab Gizi (catat makan)
+
+Ketik makanan beserta beratnya, misalnya `tempe rebus 30g, dada ayam 150g, telur 2 butir`. Aplikasi menghitung kalori, protein, lemak, karbohidrat, dan serat, lalu menampilkan lingkaran sisa kalori dan persentase tiap zat gizi terhadap target.
+
+Database berisi sekitar **1.200 bahan**: seluruh TKPI (1.141 bahan) ditambah 45 bahan dari USDA yang tidak ada di TKPI.
+
+| Ketik | Fungsi |
+|---|---|
+| `tempe rebus 30g` | catat makanan; satuan g, kg, ons |
+| `telur 2` / `2 telur` / `putih telur 3` | per butir (berat per butir bisa diubah di pengaturan Gizi) |
+| `minyak 1 sdm` | sdm untuk minyak, gula, madu, kecap, selai kacang, susu kental manis |
+| `roti 2 lembar` | lembar untuk roti tawar dan roti gandum |
+| `susu 250ml` | ml untuk susu, kopi, teh, santan, minyak |
+| `cari ikan` | tampilkan bahan yang cocok; ketuk salah satu, lalu ketik beratnya |
+| `t373 50g` | pilih bahan langsung dari kodenya (kode terlihat di hasil `cari`) |
+| `kerupuk = 480 kkal, 5p, 20l, 68k, 1s` | tambah makanan sendiri (nilai per 100 g) |
+| `sisa` / `batal` | lihat sisa hari ini / hapus catatan terakhir |
+
+- Bahan mentah dicatat dengan **berat mentah**. Bahan bertanda **siap makan** (nasi, roti, masakan seperti soto atau rendang) ditimbang dalam bentuk siap makan.
+- Kata cara masak (rebus, goreng, dll.) hanya jadi label, jadi `tahu goreng 100g` = 100 g tahu mentah. Minyak untuk menggoreng/menumis dicatat terpisah, mis. `minyak 1 sdm`. Kalau mau nilai versi matang dari TKPI, pakai `cari` lalu pilih yang bertanda siap makan.
+- `ayam` tanpa keterangan = dada ayam fillet tanpa kulit. Kalau satu nama cocok dengan banyak bahan, aplikasi memilih versi mentah/segar dan memberi tahu ada pilihan lain.
+- Sebagian bahan TKPI tidak punya data serat; serat bahan itu dihitung 0 dan aplikasi memberi tahu.
+- Sumber: TKPI (Kemenkes, panganku.org; lewat dataset github.com/intanypurbasari/food-nutrition, MIT) dan USDA FoodData Central SR Legacy. Berat per sdm/lembar/butir dari porsi standar USDA. Sumber tiap bahan tercatat di `gizi_db.js`.
+
 ## Cara mendapatkan APK (build otomatis di GitHub)
 
 1. Buat repository baru di github.com (boleh private), misalnya `kasku`.
